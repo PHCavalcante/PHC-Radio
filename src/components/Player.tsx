@@ -174,18 +174,18 @@ const Player: React.FC<PlayerProps> = ({
         <div
           className={`flex w-full h-full items-center ${
             isExpanded
-              ? "flex-col-reverse justify-center sm:flex-col max-w-md mx-auto"
-              : "flex-row justify-between"
+              ? "flex-col justify-center sm:flex-col max-w-md mx-auto"
+              : "flex-row-reverse md:flex-row justify-between"
           }`}
         >
           {metadata.title.length > 0 && metadata.artist.length > 0 && (
             <div
-              className={`flex items-center gap-2 sm:gap-4 shrink min-w-0 ${
-                isExpanded ? "flex-col order-1 mt-4 sm:mt-6 md:mt-0" : "order-2"
+              className={`flex w-full md:w-auto items-center gap-2 sm:gap-4 shrink min-w-0 ${
+                isExpanded ? "flex-col order-1 mt-4 sm:mt-6 md:mt-0" : "order-2 flex-4 md:flex-initial"
               }`}
             >
               <img
-                className={`object-cover transition-all duration-300 ${
+                className={`object-cover transition-all duration-300 ${metadata.albumArt.endsWith(".svg") && "invert"} ${
                   isExpanded
                     ? `w-48 h-48 sm:w-64 sm:h-64 md:max-w-xs md:max-h-xs rounded-full mb-4 sm:mb-5 animate-[spin_20s_linear_infinite] ${
                         metadata.albumArt.includes("music-1005.svg") &&
@@ -227,7 +227,7 @@ const Player: React.FC<PlayerProps> = ({
             className={`flex items-center cursor-default ${
               isExpanded
                 ? "flex-col order-2 w-full max-w-xs mx-auto gap-4 sm:gap-6"
-                : "order-1 gap-2 sm:gap-4"
+                : "order-1 gap-2 sm:gap-4 flex-1 md:flex-initial"
             }`}
           >
             <div className="flex items-center gap-2 sm:gap-4">
@@ -273,7 +273,7 @@ const Player: React.FC<PlayerProps> = ({
             </div>
             <div
               className={`flex items-center gap-2 sm:gap-2.5 ${
-                isExpanded ? "w-full mt-2 sm:mt-4" : ""
+                isExpanded ? "w-full mt-2 sm:mt-4" : "hidden md:flex"
               }`}
             >
               <VolumeUpIcon />
