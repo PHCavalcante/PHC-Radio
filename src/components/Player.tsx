@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import { PlayIcon, PauseIcon, VolumeUpIcon, HistoryIcon } from "./icons";
 
-const STREAM_URL = import.meta.env.VITE_STREAM_URL;
+const STREAM_URL = import.meta.env.VITE_STREAM_URL || "https://stream.zeno.fm/qnozhn4xig7uv";
 
 interface PlayerProps {
   onToggleHistory: () => void;

@@ -4,7 +4,7 @@ import { History } from "./components/History";
 import type { Song } from "./components/History";
 import "./index.css";
 
-const METADATA_URL = import.meta.env.VITE_METADATA_URL;
+const METADATA_URL = import.meta.env.VITE_METADATA_URL || "https://api.zeno.fm/mounts/metadata/subscribe/qnozhn4xig7uv";
 const DEFAULT_ALBUM_ART = "https://www.svgrepo.com/show/512532/music-1005.svg";
 const ITUNES_DEBOUNCE_MS = 500;
 
