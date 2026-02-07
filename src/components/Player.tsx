@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import { PlayIcon, PauseIcon, VolumeUpIcon, HistoryIcon } from "./icons";
+import type { ThemeColors } from "../types/theme";
 
 const STREAM_URL = import.meta.env.VITE_STREAM_URL || "https://stream.zeno.fm/qnozhn4xig7uv";
 
@@ -8,6 +9,9 @@ interface PlayerProps {
   metadata: { artist: string; title: string; albumArt: string };
   isPlaying: boolean;
   onTogglePlay: () => void;
+  themeColors: ThemeColors;
+  isExpanded?: boolean;
+  onExpandedChange?: (expanded: boolean) => void;
 }
 
 const Player: React.FC<PlayerProps> = ({
@@ -15,15 +19,26 @@ const Player: React.FC<PlayerProps> = ({
   metadata,
   isPlaying,
   onTogglePlay,
+  themeColors,
+  isExpanded: externalIsExpanded,
+  onExpandedChange,
 }) => {
-  const [isExpanded, setIsExpanded] = useState(false);
+  const [internalIsExpanded, setInternalIsExpanded] = useState(false);
+  const isExpanded = externalIsExpanded !== undefined ? externalIsExpanded : internalIsExpanded;
+  
+  const setIsExpanded = (value: boolean) => {
+    if (onExpandedChange) {
+      onExpandedChange(value);
+    } else {
+      setInternalIsExpanded(value);
+    }
+  };
   const [volume, setVolume] = useState(0.6);
   const [isLoading, setIsLoading] = useState(false);
 
   const audioRef = useRef<HTMLAudioElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
-  // Audio Refs
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const sourceRef = useRef<MediaElementAudioSourceNode | null>(null);
@@ -72,7 +87,7 @@ const Player: React.FC<PlayerProps> = ({
     canvasCtx.clearRect(0, 0, canvas.width, canvas.height);
 
     canvasCtx.lineWidth = 2 * (window.devicePixelRatio || 1);
-    canvasCtx.strokeStyle = "rgba(255, 255, 255, 0.6)";
+    canvasCtx.strokeStyle = themeColors.visualizer;
     canvasCtx.beginPath();
 
     const sliceWidth = canvas.width / bufferLength;
@@ -89,6 +104,13 @@ const Player: React.FC<PlayerProps> = ({
     canvasCtx.stroke();
     animationFrameId.current = requestAnimationFrame(drawVisualizer);
   };
+
+  useEffect(() => {
+    if (isPlaying && animationFrameId.current) {
+      cancelAnimationFrame(animationFrameId.current);
+      animationFrameId.current = requestAnimationFrame(drawVisualizer);
+    }
+  }, [themeColors.visualizer, isPlaying]);
 
   useEffect(() => {
     if (isPlaying) {
@@ -139,12 +161,29 @@ const Player: React.FC<PlayerProps> = ({
         className="absolute left-0 top-0 z-[-1] w-full h-full opacity-40"
       />
       <div
-        className={`fixed flex bottom-0 left-0 right-0 text-white border-t border-white/5 z-1000 transition-all duration-300
+        className={`fixed flex bottom-0 left-0 right-0 border-t z-1000 transition-all duration-300
           ${
             isExpanded
-              ? "h-screen flex-col justify-end p-4 sm:p-6 md:p-8 cursor-default bg-[#0a0a0a]"
-              : "h-16 sm:h-20 flex-row items-center justify-between p-2 sm:p-2.5 sm:px-5 gap-2 sm:gap-5 cursor-pointer bg-[#0f0f0f] hover:bg-[#151515]"
+              ? "h-screen flex-col justify-end p-4 sm:p-6 md:p-8 cursor-default"
+              : "h-16 sm:h-20 flex-row items-center justify-between p-2 sm:p-2.5 sm:px-5 gap-2 sm:gap-5 cursor-pointer"
           }`}
+        style={{
+          backgroundColor: isExpanded ? themeColors.background : themeColors.backgroundSecondary,
+          borderColor: themeColors.border,
+          color: themeColors.text,
+        }}
+        onMouseEnter={(e) => {
+          if (!isExpanded) {
+            e.currentTarget.style.backgroundColor = themeColors.mode === "dark" 
+              ? "rgba(21, 21, 21, 1)" 
+              : "rgba(243, 244, 246, 1)";
+          }
+        }}
+        onMouseLeave={(e) => {
+          if (!isExpanded) {
+            e.currentTarget.style.backgroundColor = themeColors.backgroundSecondary;
+          }
+        }}
         onClick={() => !isExpanded && setIsExpanded(true)}
       >
         <audio
@@ -156,7 +195,20 @@ const Player: React.FC<PlayerProps> = ({
         />
         {isExpanded && (
           <button
-            className="self-end absolute top-4 right-4 sm:top-5 sm:right-6 md:right-10 cursor-pointer p-2 rounded hover:bg-white/5 transition-colors"
+            className="self-end absolute top-4 right-4 sm:top-5 sm:right-6 md:right-10 cursor-pointer p-2 rounded transition-colors"
+            style={{
+              color: themeColors.text,
+              zIndex: 10001,
+              position: "relative",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = themeColors.mode === "dark" 
+                ? "rgba(255, 255, 255, 0.05)" 
+                : "rgba(0, 0, 0, 0.05)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = "transparent";
+            }}
             onClick={(e) => {
               e.stopPropagation();
               setIsExpanded(false);
@@ -166,7 +218,10 @@ const Player: React.FC<PlayerProps> = ({
               src="https://www.svgrepo.com/show/521469/arrow-down.svg"
               width={24}
               alt="Minimize"
-              className="invert opacity-70 hover:opacity-100 transition-opacity"
+              className="opacity-70 hover:opacity-100 transition-opacity"
+              style={{
+                filter: themeColors.mode === "dark" ? "invert(1)" : "invert(0)",
+              }}
             />
           </button>
         )}
@@ -203,18 +258,20 @@ const Player: React.FC<PlayerProps> = ({
                 }`}
               >
                 <p
-                  className={`font-semibold whitespace-nowrap overflow-hidden text-ellipsis text-white ${
+                  className={`font-semibold whitespace-nowrap overflow-hidden text-ellipsis ${
                     isExpanded ? "text-xl sm:text-2xl" : "text-xs sm:text-sm"
                   }`}
+                  style={{ color: themeColors.text }}
                 >
                   {metadata.title}
                 </p>
                 <p
-                  className={`whitespace-nowrap overflow-hidden text-ellipsis text-gray-400 ${
+                  className={`whitespace-nowrap overflow-hidden text-ellipsis ${
                     isExpanded
                       ? "text-base sm:text-lg mt-1"
                       : "text-[10px] sm:text-xs"
                   }`}
+                  style={{ color: themeColors.textSecondary }}
                 >
                   {metadata.artist}
                 </p>
@@ -235,16 +292,25 @@ const Player: React.FC<PlayerProps> = ({
                 <div
                   className={`rounded-full flex items-center justify-center ${
                     isExpanded
-                      ? "w-16 h-16 sm:w-20 sm:h-20 bg-white/10"
+                      ? "w-16 h-16 sm:w-20 sm:h-20"
                       : "w-8 h-8 sm:w-10 sm:h-10"
                   }`}
+                  style={{
+                    backgroundColor: themeColors.mode === "dark" 
+                      ? "rgba(255, 255, 255, 0.1)" 
+                      : "rgba(0, 0, 0, 0.1)",
+                  }}
                 >
                   <div
-                    className={`animate-spin rounded-full border-2 border-white border-t-transparent ${
+                    className={`animate-spin rounded-full border-2 border-t-transparent ${
                       isExpanded
                         ? "w-8 h-8 sm:w-10 sm:h-10"
                         : "w-5 h-5 sm:w-6 sm:h-6"
                     }`}
+                    style={{
+                      borderColor: themeColors.text,
+                      borderTopColor: "transparent",
+                    }}
                   />
                 </div>
               ) : (
@@ -255,9 +321,31 @@ const Player: React.FC<PlayerProps> = ({
                   }}
                   className={`bg-none border-none rounded-full cursor-pointer flex items-center justify-center transition-all duration-200 hover:scale-105 active:scale-95 ${
                     isExpanded
-                      ? "w-16 h-16 sm:w-20 sm:h-20 bg-white text-black hover:bg-gray-100"
-                      : "w-8 h-8 sm:w-10 sm:h-10 hover:bg-white/10"
+                      ? "w-16 h-16 sm:w-20 sm:h-20"
+                      : "w-8 h-8 sm:w-10 sm:h-10"
                   }`}
+                  style={{
+                    backgroundColor: isExpanded ? themeColors.accent : "transparent",
+                    color: isExpanded 
+                      ? (themeColors.mode === "dark" ? "#000000" : "#ffffff")
+                      : themeColors.text,
+                  }}
+                  onMouseEnter={(e) => {
+                    if (isExpanded) {
+                      e.currentTarget.style.backgroundColor = themeColors.accentHover;
+                    } else {
+                      e.currentTarget.style.backgroundColor = themeColors.mode === "dark" 
+                        ? "rgba(255, 255, 255, 0.1)" 
+                        : "rgba(0, 0, 0, 0.1)";
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (isExpanded) {
+                      e.currentTarget.style.backgroundColor = themeColors.accent;
+                    } else {
+                      e.currentTarget.style.backgroundColor = "transparent";
+                    }
+                  }}
                 >
                   {isPlaying ? <PauseIcon /> : <PlayIcon />}
                 </button>
@@ -265,7 +353,18 @@ const Player: React.FC<PlayerProps> = ({
               {!isExpanded && (
                 <button
                   onClick={onToggleHistory}
-                  className="text-white hover:text-gray-300 transition-colors p-1.5 sm:p-2 rounded hover:bg-white/5"
+                  className="transition-colors p-1.5 sm:p-2 rounded"
+                  style={{ color: themeColors.text }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.color = themeColors.textSecondary;
+                    e.currentTarget.style.backgroundColor = themeColors.mode === "dark" 
+                      ? "rgba(255, 255, 255, 0.05)" 
+                      : "rgba(0, 0, 0, 0.05)";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.color = themeColors.text;
+                    e.currentTarget.style.backgroundColor = "transparent";
+                  }}
                 >
                   <HistoryIcon className="w-5 h-5 sm:w-6 sm:h-6" />
                 </button>
@@ -284,8 +383,25 @@ const Player: React.FC<PlayerProps> = ({
                 step="0.05"
                 value={volume}
                 onChange={handleVolumeChange}
-                className="w-full h-1 bg-white/20 rounded-full outline-none appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:rounded-full"
+                className="w-full h-1 rounded-full outline-none appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:rounded-full"
+                style={{
+                  backgroundColor: themeColors.mode === "dark" 
+                    ? "rgba(255, 255, 255, 0.2)" 
+                    : "rgba(0, 0, 0, 0.2)",
+                }}
+                onMouseEnter={(e) => {
+                  const style = e.currentTarget.style;
+                  style.setProperty("--thumb-color", themeColors.accent);
+                }}
               />
+              <style>{`
+                input[type="range"]::-webkit-slider-thumb {
+                  background-color: ${themeColors.accent} !important;
+                }
+                input[type="range"]::-moz-range-thumb {
+                  background-color: ${themeColors.accent} !important;
+                }
+              `}</style>
             </div>
           </div>
         </div>

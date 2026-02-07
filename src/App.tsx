@@ -1,7 +1,10 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import Player from "./components/Player";
 import { History } from "./components/History";
+import { ThemeSelector } from "./components/ThemeSelector";
 import type { Song } from "./components/History";
+import { useTheme } from "./contexts/ThemeContext";
+import { getThemeColors } from "./types/theme";
 import "./index.css";
 
 const METADATA_URL = import.meta.env.VITE_METADATA_URL || "https://api.zeno.fm/mounts/metadata/subscribe/qnozhn4xig7uv";
@@ -15,6 +18,12 @@ interface Metadata {
 }
 
 function App() {
+  const { theme } = useTheme();
+  const colors = useMemo(
+    () => getThemeColors(theme.mode, theme.colorScheme),
+    [theme.mode, theme.colorScheme]
+  );
+  
   const [metadata, setMetadata] = useState<Metadata>({
     artist: "",
     title: "",
@@ -24,8 +33,15 @@ function App() {
   const [songHistory, setSongHistory] = useState<Song[]>([]);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [isPlayerExpanded, setIsPlayerExpanded] = useState(false);
 
   const lastProcessedTitle = useRef("");
+
+  useEffect(() => {
+    document.documentElement.style.setProperty("--theme-bg", colors.background);
+    document.documentElement.style.setProperty("--theme-text", colors.text);
+    document.body.style.backgroundColor = colors.background;
+  }, [colors]);
 
   const handleTogglePlay = useCallback(() => setIsPlaying((prev) => !prev), []);
   const handleToggleHistory = useCallback(
@@ -139,8 +155,20 @@ function App() {
   }, [streamTitle, fetchAlbumArt]);
 
   return (
-    <main className="flex flex-col items-center min-h-screen p-3 sm:p-5 box-border gap-4 sm:gap-10 w-full">
-      <h1 className="font-lobster text-2xl sm:text-3xl font-normal text-white m-0 text-center">
+    <main className="flex flex-col items-center min-h-screen p-3 sm:p-5 box-border gap-4 sm:gap-10 w-full relative overflow-visible">
+      <div 
+        className="w-full flex justify-end relative" 
+        style={{ 
+          zIndex: isPlayerExpanded || isHistoryOpen ? 1 : 10000,
+          pointerEvents: isPlayerExpanded || isHistoryOpen ? "none" : "auto",
+        }}
+      >
+        <ThemeSelector />
+      </div>
+      <h1
+        className="font-lobster text-2xl sm:text-3xl font-normal m-0 text-center transition-colors"
+        style={{ color: colors.text }}
+      >
         PHC Radio
       </h1>
       <Player
@@ -148,9 +176,12 @@ function App() {
         metadata={metadata}
         isPlaying={isPlaying}
         onTogglePlay={handleTogglePlay}
+        themeColors={colors}
+        isExpanded={isPlayerExpanded}
+        onExpandedChange={setIsPlayerExpanded}
       />
       {isHistoryOpen && (
-        <History songs={songHistory} onClose={handleToggleHistory} />
+        <History songs={songHistory} onClose={handleToggleHistory} themeColors={colors} />
       )}
     </main>
   );
