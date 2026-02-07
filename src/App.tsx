@@ -2,6 +2,8 @@ import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import Player from "./components/Player";
 import { History } from "./components/History";
 import { ThemeSelector } from "./components/ThemeSelector";
+import { ToastContainer } from "./components/Toast";
+import { useToast } from "./hooks/useToast";
 import type { Song } from "./components/History";
 import { useTheme } from "./contexts/ThemeContext";
 import { getThemeColors } from "./types/theme";
@@ -19,6 +21,7 @@ interface Metadata {
 
 function App() {
   const { theme } = useTheme();
+  const { toasts, showToast, removeToast } = useToast();
   const colors = useMemo(
     () => getThemeColors(theme.mode, theme.colorScheme),
     [theme.mode, theme.colorScheme]
@@ -34,8 +37,10 @@ function App() {
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isPlayerExpanded, setIsPlayerExpanded] = useState(false);
+  const [isTransitioning, setIsTransitioning] = useState(false);
 
   const lastProcessedTitle = useRef("");
+  const hasConnectedRef = useRef(false);
 
   useEffect(() => {
     document.documentElement.style.setProperty("--theme-bg", colors.background);
@@ -106,6 +111,18 @@ function App() {
   useEffect(() => {
     if (!isPlaying) return;
     const eventSource = new EventSource(METADATA_URL);
+    
+    eventSource.onopen = () => {
+      if (!hasConnectedRef.current) {
+        hasConnectedRef.current = true;
+        showToast("Conectado com sucesso", "success", 2000);
+      }
+    };
+
+    eventSource.onerror = () => {
+      showToast("Erro ao conectar com a rádio. Tentando novamente...", "error", 4000);
+    };
+
     eventSource.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
@@ -117,18 +134,23 @@ function App() {
         }
       } catch (error) {
         console.error("Error processing metadata:", error);
+        showToast("Erro ao processar informações da música", "error", 3000);
       }
     };
     return () => eventSource.close();
-  }, [isPlaying]);
+  }, [isPlaying, showToast]);
 
   useEffect(() => {
     if (!streamTitle || streamTitle === lastProcessedTitle.current) return;
     const newMetadata = parseStreamTitle(streamTitle);
     if (newMetadata.title === "Connecting...") return;
 
-    setMetadata(newMetadata);
-    lastProcessedTitle.current = streamTitle;
+    setIsTransitioning(true);
+    setTimeout(() => {
+      setMetadata(newMetadata);
+      lastProcessedTitle.current = streamTitle;
+      setIsTransitioning(false);
+    }, 200);
 
     setSongHistory((prev) => {
       if (
@@ -179,10 +201,12 @@ function App() {
         themeColors={colors}
         isExpanded={isPlayerExpanded}
         onExpandedChange={setIsPlayerExpanded}
+        isTransitioning={isTransitioning}
       />
       {isHistoryOpen && (
         <History songs={songHistory} onClose={handleToggleHistory} themeColors={colors} />
       )}
+      <ToastContainer toasts={toasts} onClose={removeToast} themeColors={colors} />
     </main>
   );
 }

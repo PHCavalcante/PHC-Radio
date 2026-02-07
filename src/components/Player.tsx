@@ -12,6 +12,7 @@ interface PlayerProps {
   themeColors: ThemeColors;
   isExpanded?: boolean;
   onExpandedChange?: (expanded: boolean) => void;
+  isTransitioning?: boolean;
 }
 
 const Player: React.FC<PlayerProps> = ({
@@ -22,6 +23,7 @@ const Player: React.FC<PlayerProps> = ({
   themeColors,
   isExpanded: externalIsExpanded,
   onExpandedChange,
+  isTransitioning = false,
 }) => {
   const [internalIsExpanded, setInternalIsExpanded] = useState(false);
   const isExpanded = externalIsExpanded !== undefined ? externalIsExpanded : internalIsExpanded;
@@ -38,6 +40,7 @@ const Player: React.FC<PlayerProps> = ({
 
   const audioRef = useRef<HTMLAudioElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const wasPausedRef = useRef(false);
 
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
@@ -118,9 +121,26 @@ const Player: React.FC<PlayerProps> = ({
       if (audioContextRef.current?.state === "suspended") {
         audioContextRef.current.resume();
       }
-      audioRef.current?.play().catch(() => onTogglePlay());
+      
+      // Se estava pausado, recarrega o src para pegar o ponto atual da stream
+      if (wasPausedRef.current && audioRef.current) {
+        const currentVolume = audioRef.current.volume;
+        audioRef.current.src = STREAM_URL;
+        audioRef.current.load();
+        audioRef.current.volume = currentVolume;
+        wasPausedRef.current = false;
+        setTimeout(() => {
+          audioRef.current?.play().catch(() => onTogglePlay());
+        }, 100);
+      } else {
+        audioRef.current?.play().catch(() => onTogglePlay());
+      }
+      
       animationFrameId.current = requestAnimationFrame(drawVisualizer);
     } else {
+      if (audioRef.current && !audioRef.current.paused) {
+        wasPausedRef.current = true;
+      }
       audioRef.current?.pause();
       if (animationFrameId.current)
         cancelAnimationFrame(animationFrameId.current);
@@ -129,7 +149,7 @@ const Player: React.FC<PlayerProps> = ({
       if (animationFrameId.current)
         cancelAnimationFrame(animationFrameId.current);
     };
-  }, [isPlaying]);
+  }, [isPlaying, onTogglePlay]);
 
   // Handle Resize
   useEffect(() => {
@@ -190,8 +210,17 @@ const Player: React.FC<PlayerProps> = ({
           ref={audioRef}
           src={STREAM_URL}
           crossOrigin="anonymous"
+          preload="none"
           onWaiting={() => isPlaying && setIsLoading(true)}
           onCanPlay={() => setIsLoading(false)}
+          onError={(e) => {
+            setIsLoading(false);
+            console.error("Audio error:", e);
+          }}
+          onStalled={() => {
+            if (isPlaying) setIsLoading(true);
+          }}
+          onSuspend={() => setIsLoading(false)}
         />
         {isExpanded && (
           <button
@@ -237,7 +266,7 @@ const Player: React.FC<PlayerProps> = ({
             <div
               className={`flex w-full md:w-auto items-center gap-2 sm:gap-4 shrink min-w-0 ${
                 isExpanded ? "flex-col order-1 mt-4 sm:mt-6 md:mt-0" : "order-2 flex-4 md:flex-initial"
-              }`}
+              } ${isTransitioning ? "animate-fadeOut" : "animate-slideUp"}`}
             >
               <img
                 className={`object-cover transition-all duration-300 ${metadata.albumArt.endsWith(".svg") && "invert"} ${
@@ -247,7 +276,7 @@ const Player: React.FC<PlayerProps> = ({
                         "grayscale"
                       }`
                     : "w-10 h-10 sm:w-[50px] sm:h-[50px] rounded hover:opacity-90"
-                }`}
+                } ${isTransitioning ? "opacity-50" : ""}`}
                 src={metadata.albumArt}
                 alt="Album art"
                 draggable={false}
@@ -258,19 +287,19 @@ const Player: React.FC<PlayerProps> = ({
                 }`}
               >
                 <p
-                  className={`font-semibold whitespace-nowrap overflow-hidden text-ellipsis ${
+                  className={`font-semibold whitespace-nowrap overflow-hidden text-ellipsis transition-opacity ${
                     isExpanded ? "text-xl sm:text-2xl" : "text-xs sm:text-sm"
-                  }`}
+                  } ${isTransitioning ? "opacity-50" : ""}`}
                   style={{ color: themeColors.text }}
                 >
                   {metadata.title}
                 </p>
                 <p
-                  className={`whitespace-nowrap overflow-hidden text-ellipsis ${
+                  className={`whitespace-nowrap overflow-hidden text-ellipsis transition-opacity ${
                     isExpanded
                       ? "text-base sm:text-lg mt-1"
                       : "text-[10px] sm:text-xs"
-                  }`}
+                  } ${isTransitioning ? "opacity-50" : ""}`}
                   style={{ color: themeColors.textSecondary }}
                 >
                   {metadata.artist}
@@ -290,7 +319,7 @@ const Player: React.FC<PlayerProps> = ({
             <div className="flex items-center gap-2 sm:gap-4">
               {isLoading ? (
                 <div
-                  className={`rounded-full flex items-center justify-center ${
+                  className={`rounded-full flex flex-col items-center justify-center ${
                     isExpanded
                       ? "w-16 h-16 sm:w-20 sm:h-20"
                       : "w-8 h-8 sm:w-10 sm:h-10"
@@ -312,6 +341,14 @@ const Player: React.FC<PlayerProps> = ({
                       borderTopColor: "transparent",
                     }}
                   />
+                  {isExpanded && (
+                    <p
+                      className="text-xs mt-2 animate-pulse"
+                      style={{ color: themeColors.textSecondary }}
+                    >
+                      Carregando...
+                    </p>
+                  )}
                 </div>
               ) : (
                 <button
