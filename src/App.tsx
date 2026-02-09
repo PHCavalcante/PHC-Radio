@@ -108,6 +108,45 @@ function App() {
     []
   );
 
+  const fetchSongDetails = useCallback(
+    async (searchTerm: string, currentTitle: string, currentArtist: string) => {
+      try {
+        const cleanTerm = searchTerm.replace(/\(.*\)|\[.*\]/g, "").trim();
+        const url = `https://itunes.apple.com/search?term=${encodeURIComponent(
+          cleanTerm
+        )}&entity=song&limit=1`;
+        const response = await fetch(url);
+        if (!response.ok) return;
+
+        const data = await response.json();
+        const track = data.results?.[0];
+        
+        if (!track) return;
+
+        const releaseDate = track.releaseDate 
+          ? new Date(track.releaseDate).getFullYear()
+          : undefined;
+        const genre = track.primaryGenreName || track.genreName;
+
+        setSongHistory((prev) =>
+          prev.map((song) =>
+            song.title === currentTitle && song.artist === currentArtist
+              ? {
+                  ...song,
+                  genre: genre || song.genre,
+                  releaseYear: releaseDate || song.releaseYear,
+                  albumName: track.collectionName || song.albumName,
+                }
+              : song
+          )
+        );
+      } catch (error) {
+        console.error("Error fetching song details:", error);
+      }
+    },
+    []
+  );
+
   useEffect(() => {
     if (!isPlaying) return;
     const eventSource = new EventSource(METADATA_URL);
@@ -165,16 +204,18 @@ function App() {
         title: newMetadata.title,
         artist: newMetadata.artist,
         albumArtUrl: DEFAULT_ALBUM_ART,
+        timestamp: Date.now(),
       };
       return [newEntry, ...prev].slice(0, 20);
     });
 
     const timeoutId = setTimeout(() => {
       fetchAlbumArt(streamTitle, newMetadata.title);
+      fetchSongDetails(streamTitle, newMetadata.title, newMetadata.artist);
     }, ITUNES_DEBOUNCE_MS);
 
     return () => clearTimeout(timeoutId);
-  }, [streamTitle, fetchAlbumArt]);
+  }, [streamTitle, fetchAlbumArt, fetchSongDetails]);
 
   return (
     <main className="flex flex-col items-center min-h-screen p-3 sm:p-5 box-border gap-4 sm:gap-10 w-full relative overflow-visible">

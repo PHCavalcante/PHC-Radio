@@ -7,6 +7,10 @@ export interface Song {
   title: string;
   artist: string;
   albumArtUrl?: string;
+  timestamp?: number;
+  genre?: string;
+  releaseYear?: number;
+  albumName?: string;
 }
 
 interface HistoryProps {
@@ -27,6 +31,32 @@ export function History({ songs, onClose, themeColors }: HistoryProps) {
     const query = encodeURIComponent(`${title} ${artist}`);
     const url = `https://open.spotify.com/search/${query}`;
     window.open(url, "_blank", "noopener,noreferrer");
+  };
+
+  const formatTimestamp = (timestamp?: number): string => {
+    if (!timestamp) return "";
+    
+    const now = Date.now();
+    const diff = now - timestamp;
+    const minutes = Math.floor(diff / 60000);
+    const hours = Math.floor(diff / 3600000);
+    const days = Math.floor(diff / 86400000);
+
+    if (minutes < 1) return "Agora";
+    if (minutes < 60) return `Há ${minutes} min`;
+    if (hours < 24) return `Há ${hours} ${hours === 1 ? "hora" : "horas"}`;
+    if (days === 1) return "Ontem";
+    if (days < 7) return `Há ${days} dias`;
+    
+    const date = new Date(timestamp);
+    const today = new Date();
+    const isThisYear = date.getFullYear() === today.getFullYear();
+    
+    if (isThisYear) {
+      return date.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" });
+    }
+    
+    return date.toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric" });
   };
 
   return (
@@ -142,6 +172,35 @@ export function History({ songs, onClose, themeColors }: HistoryProps) {
                   >
                     {song.artist}
                   </p>
+                  <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                    {song.genre && (
+                      <span
+                        className="text-[9px] sm:text-[10px] px-1.5 py-0.5 rounded"
+                        style={{
+                          backgroundColor: themeColors.backgroundTertiary,
+                          color: themeColors.textSecondary,
+                        }}
+                      >
+                        {song.genre}
+                      </span>
+                    )}
+                    {song.releaseYear && (
+                      <span
+                        className="text-[9px] sm:text-[10px]"
+                        style={{ color: themeColors.textSecondary, opacity: 0.8 }}
+                      >
+                        {song.releaseYear}
+                      </span>
+                    )}
+                    {song.timestamp && (
+                      <span
+                        className="text-[9px] sm:text-[10px]"
+                        style={{ color: themeColors.textSecondary, opacity: 0.7 }}
+                      >
+                        • {formatTimestamp(song.timestamp)}
+                      </span>
+                    )}
+                  </div>
                 </div>
                 {hoveredSongId === song.id && (
                   <div className="relative group/spotify shrink-0">
